@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Flash Sale System</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <div>
+        <h1>Flash Sale System</h1>
+        <p class="tagline">Gateway &rarr; Checkout &rarr; RabbitMQ &rarr; Processing &rarr; Notification, decoupled and concurrency-safe.</p>
+      </div>
+    </div>
+    <nav class="links">
+      <a href="https://github.com/YOUR-USERNAME/flash-sale-system" id="github-link" target="_blank" rel="noopener">GitHub</a>
+      <img id="ci-badge" alt="CI status" src="https://github.com/YOUR-USERNAME/flash-sale-system/actions/workflows/ci.yml/badge.svg" onerror="this.style.display='none'" />
+      <img id="deploy-badge" alt="Deploy status" src="https://github.com/YOUR-USERNAME/flash-sale-system/actions/workflows/deploy.yml/badge.svg" onerror="this.style.display='none'" />
+    </nav>
+  </header>
+
+  <main>
+    <section class="panel product-panel" aria-labelledby="product-heading">
+      <h2 id="product-heading">Flash Sale Item</h2>
+      <div class="product-card">
+        <div class="product-info">
+          <div class="product-name" id="product-name">Loading&hellip;</div>
+          <div class="product-price" id="product-price"></div>
+        </div>
+        <div class="stock-meter">
+          <div class="stock-bar"><div class="stock-bar-fill" id="stock-fill"></div></div>
+          <div class="stock-label" id="stock-label">&ndash; / &ndash; remaining</div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <label class="control">
+          <span>User ID</span>
+          <input id="user-id" type="text" value="demo-user" />
+        </label>
+        <button id="buy-now-btn" class="btn btn-primary">Buy Now</button>
+        <button id="spike-btn" class="btn">Simulate Traffic Spike (200)</button>
+        <button id="duplicate-btn" class="btn">Simulate Duplicate Request (50)</button>
+        <button id="reset-btn" class="btn btn-ghost">Reset Demo</button>
+      </div>
+      <p class="hint">Spike and duplicate simulations fire real concurrent requests at the live backend - the counters below are read straight from its responses, not scripted.</p>
+    </section>
+
+    <section class="panel pipeline-panel" aria-labelledby="pipeline-heading">
+      <h2 id="pipeline-heading">Live request pipeline</h2>
+      <div class="pipeline" id="pipeline">
+        <div class="node" data-hop="GATEWAY"><span class="node-dot"></span><span class="node-label">Gateway</span></div>
+        <div class="edge"></div>
+        <div class="node" data-hop="CREATED"><span class="node-dot"></span><span class="node-label">Checkout</span></div>
+        <div class="edge"></div>
+        <div class="node" data-hop="QUEUED"><span class="node-dot"></span><span class="node-label">RabbitMQ</span></div>
+        <div class="edge"></div>
+        <div class="node" data-hop="PROCESSING"><span class="node-dot"></span><span class="node-label">Processing</span></div>
+        <div class="edge"></div>
+        <div class="node" data-hop="NOTIFIED"><span class="node-dot"></span><span class="node-label">Notification</span></div>
+      </div>
+      <div id="order-status" class="order-status"></div>
+      <div id="notification-preview" class="notification-preview" hidden></div>
+      <details class="event-log">
+        <summary>Raw event log</summary>
+        <pre id="event-log-content"></pre>
+      </details>
+    </section>
+
+    <section class="panel results-panel" aria-labelledby="results-heading">
+      <h2 id="results-heading">Simulation results</h2>
+      <div id="results-content" class="results-content">
+        <p class="hint">Run a simulation above to see aggregate results here.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>Backend-focused portfolio project: Java 21 + Spring Boot, RabbitMQ, Redis, Postgres, Docker Compose, GitHub Actions CI/CD, deployed on an Oracle Cloud free-tier VM.</p>
+    <p><a href="https://github.com/YOUR-USERNAME/flash-sale-system" id="github-link-footer" target="_blank" rel="noopener">Source on GitHub</a></p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

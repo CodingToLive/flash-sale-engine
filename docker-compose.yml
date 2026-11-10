@@ -1,0 +1,113 @@
+name: flash-sale-system
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: flashsale
+      POSTGRES_USER: flashsale
+      POSTGRES_PASSWORD: flashsale
+    ports: ["5432:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flashsale"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports: ["5672:5672", "15672:15672"]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+  checkout-service:
+    build:
+      context: .
+      dockerfile: checkout-service/Dockerfile
+    environment:
+      DB_HOST: postgres
+      REDIS_HOST: redis
+      RABBITMQ_HOST: rabbitmq
+      ADMIN_SECRET: ${ADMIN_SECRET:-demo-admin-secret}
+    ports: ["8081:8081"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+
+  order-processing-service:
+    build:
+      context: .
+      dockerfile: order-processing-service/Dockerfile
+    environment:
+      DB_HOST: postgres
+      REDIS_HOST: redis
+      RABBITMQ_HOST: rabbitmq
+    ports: ["8082:8082"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+      checkout-service: { condition: service_started }
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: notification-service/Dockerfile
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      EMAIL_ENABLED: ${EMAIL_ENABLED:-false}
+    ports: ["8083:8083"]
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+      checkout-service: { condition: service_started }
+
+  tracking-service:
+    build:
+      context: .
+      dockerfile: tracking-service/Dockerfile
+    environment:
+      RABBITMQ_HOST: rabbitmq
+    ports: ["8084:8084"]
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+
+  gateway-service:
+    build:
+      context: .
+      dockerfile: gateway-service/Dockerfile
+    environment:
+      REDIS_HOST: redis
+      CHECKOUT_SERVICE_URI: http://checkout-service:8081
+      TRACKING_SERVICE_URI: http://tracking-service:8084
+    ports: ["8080:8080"]
+    depends_on:
+      redis: { condition: service_healthy }
+      checkout-service: { condition: service_started }
+      tracking-service: { condition: service_started }
+
+  caddy:
+    image: caddy:2-alpine
+    ports: ["18080:80"]
+    volumes:
+      - ./infra/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./frontend:/srv/frontend:ro
+    depends_on:
+      - gateway-service
+
+volumes:
+  pgdata:
