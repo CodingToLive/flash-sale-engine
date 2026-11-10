@@ -1,0 +1,116 @@
+name: flash-sale-system
+
+# Deployed on the Oracle Cloud VM only. Lives alongside Caddyfile and .env in
+# /opt/flash-sale-system on the VM (see infra/oracle-vm-setup.md) - never committed
+# with real secrets. GitHub Actions deploys by running:
+#   docker compose -f docker-compose.prod.yml pull && docker compose -f docker-compose.prod.yml up -d
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: flashsale
+      POSTGRES_USER: flashsale
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flashsale"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+  checkout-service:
+    image: ghcr.io/${GHCR_NAMESPACE}/flash-sale-checkout:latest
+    environment:
+      DB_HOST: postgres
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: redis
+      RABBITMQ_HOST: rabbitmq
+      ADMIN_SECRET: ${ADMIN_SECRET}
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+
+  order-processing-service:
+    image: ghcr.io/${GHCR_NAMESPACE}/flash-sale-order-processing:latest
+    environment:
+      DB_HOST: postgres
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: redis
+      RABBITMQ_HOST: rabbitmq
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+
+  notification-service:
+    image: ghcr.io/${GHCR_NAMESPACE}/flash-sale-notification:latest
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      EMAIL_ENABLED: ${EMAIL_ENABLED:-false}
+      EMAIL_FROM: ${EMAIL_FROM:-no-reply@flash-sale-demo.local}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+    restart: unless-stopped
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+
+  tracking-service:
+    image: ghcr.io/${GHCR_NAMESPACE}/flash-sale-tracking:latest
+    environment:
+      RABBITMQ_HOST: rabbitmq
+    restart: unless-stopped
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+
+  gateway-service:
+    image: ghcr.io/${GHCR_NAMESPACE}/flash-sale-gateway:latest
+    environment:
+      REDIS_HOST: redis
+      CHECKOUT_SERVICE_URI: http://checkout-service:8081
+      TRACKING_SERVICE_URI: http://tracking-service:8084
+    restart: unless-stopped
+    depends_on:
+      redis: { condition: service_healthy }
+
+  caddy:
+    image: caddy:2-alpine
+    environment:
+      CADDY_ADDRESS: ${CADDY_ADDRESS}
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./frontend:/srv/frontend:ro
+      - caddy_data:/data
+    restart: unless-stopped
+    depends_on:
+      - gateway-service
+
+volumes:
+  pgdata:
+  caddy_data:
