@@ -8,7 +8,6 @@ import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
-import reactor.core.publisher.Mono;
 
 /**
  * Single public entry point: routes to checkout-service and tracking-service, with a
@@ -24,13 +23,6 @@ public class GatewayRoutesConfig {
 
     @Value("${app.tracking-service-uri}")
     private String trackingServiceUri;
-
-    @Bean
-    public KeyResolver ipKeyResolver() {
-        return exchange -> Mono.justOrEmpty(exchange.getRequest().getRemoteAddress())
-                .map(addr -> addr.getAddress().getHostAddress())
-                .defaultIfEmpty("unknown");
-    }
 
     @Bean
     public RedisRateLimiter checkoutRateLimiter() {
